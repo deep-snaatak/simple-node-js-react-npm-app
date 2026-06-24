@@ -3,7 +3,7 @@
 
 node {
     // Define the path to the coverage report that Vitest will generate
-    def securityReportName = 'coverage/lcov-report/index.html' 
+    def securityReportName = 'coverage/index.html'
     
     try {
         stage('Checkout') {
