@@ -3,7 +3,7 @@
 
 node {
     // Define the path to the coverage report that Vitest will generate
-    def securityReportName = 'coverage/index.html'
+    def securityReportName = 'coverage/index.html' 
     
     try {
         stage('Checkout') {
@@ -27,23 +27,35 @@ node {
                 echo "3. Fixing missing Vitest coverage dependency on the fly..."
                 npm install --save-dev @vitest/coverage-v8
                 
-                echo "4. Executing Unit Tests..."
-                npm run test -- --coverage
+                echo "4. Executing Unit Tests with Dual Reporting (Functional & Coverage)..."
+                # --reporter=default outputs text to console
+                # --reporter=junit outputs functional pass/fail data to junit.xml
+                npm run test -- --coverage \
+                  --reporter=default \
+                  --reporter=junit \
+                  --outputFile=junit.xml \
+                  --coverage.thresholds.statements=80 \
+                  --coverage.thresholds.branches=80 \
+                  --coverage.thresholds.functions=80 \
+                  --coverage.thresholds.lines=80
                 '''
             }
         }
         
         stage('Save Artifacts') {
-            // 4. Save the coverage report to the Jenkins server so the email link works
+            // 4. Save the coverage dashboard folder to the Jenkins server
             archiveArtifacts artifacts: 'coverage/**', allowEmptyArchive: true
+            
+            // 5. Publish the functional pass/fail test report directly onto the Jenkins UI dashboard
+            junit testResults: 'junit.xml', allowEmptyResults: true
         }
         
     } catch (Exception e) {
-        // If any stage fails, explicitly mark the build as a failure
+        // If any stage fails (broken test or low coverage), mark the build as failed
         currentBuild.result = 'FAILURE'
         throw e 
     } finally {
-        // 5. Always send the notification alert, regardless of pass or fail
+        // 6. Always send the notification alert, regardless of pass or fail
         notifyTeam(currentBuild.currentResult ?: 'SUCCESS', [
             projectModule: 'Salary & Attendance Management System',
             slackChannel: '#jenkins-alerts',
