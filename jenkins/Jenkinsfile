@@ -2,42 +2,40 @@
 @Library('shared-library') _
 
 node {
-    // Define the path to the React coverage report Jest generates
     def securityReportName = 'coverage/lcov-report/index.html' 
     
     try {
         stage('Checkout') {
-            // Pulls the code from your currently configured Git branch
             checkout scm
         }
 
-        stage('Install Dependencies') {
-            sh 'npm install'
-        }
-
-        stage('Unit Testing') {
-            // CI=true prevents Jest from hanging in interactive watch mode.
-            // We removed the openssl flag because your Jenkins runs Node v16.
-            withEnv(['CI=true']) {
-                // The --coverage flag creates the 'coverage/' folder
-                sh 'npm run test -- --coverage'
+        stage('Build & Test') {
+            // 2. Request the Global Tool by the exact name configured in the Jenkins UI
+            def nodeHome = tool name: 'NodeJS 20', type: 'jenkins.plugins.nodejs.tools.NodeJSInstallation'
+            
+            // 3. Inject the tool's bin folder into the PATH, alongside CI=true
+            withEnv(["PATH+NODE=${nodeHome}/bin", 'CI=true']) {
+                sh '''
+                echo "1. Verifying Jenkins Global Tool Node Version:"
+                node -v
+                
+                echo "2. Installing Dependencies..."
+                npm install
+                
+                echo "3. Executing Unit Tests..."
+                npm run test -- --coverage
+                '''
             }
         }
         
         stage('Save Artifacts') {
-            // This saves the report to the Jenkins server so your team can view it 
-            // when they click the link in the email or Slack alert.
             archiveArtifacts artifacts: 'coverage/**', allowEmptyArchive: true
         }
         
     } catch (Exception e) {
-        // If any stage above fails (like a broken test), mark the build as failed
         currentBuild.result = 'FAILURE'
         throw e 
     } finally {
-        // This 'finally' block acts exactly like 'post { always { ... } }'.
-        // It guarantees the notification is sent whether the pipeline passed or failed.
-        
         notifyTeam(currentBuild.currentResult ?: 'SUCCESS', [
             projectModule: 'Salary & Attendance Management System',
             slackChannel: '#jenkins-alerts',
