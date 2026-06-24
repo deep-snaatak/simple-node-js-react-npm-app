@@ -12,10 +12,10 @@ node {
         }
 
         stage('Build & Test') {
-            // 2. Request the Global Tool exactly as you named it in the Jenkins UI
+            // Request the Global Tool exactly as you named it in the Jenkins UI
             def nodeHome = tool name: 'NodeJS 20', type: 'jenkins.plugins.nodejs.tools.NodeJSInstallation'
             
-            // 3. Inject Node 20 into the PATH and set CI=true to prevent hanging
+            // Inject Node 20 into the PATH and set CI=true to prevent hanging
             withEnv(["PATH+NODE=${nodeHome}/bin", 'CI=true']) {
                 sh '''
                 echo "1. Verifying Jenkins Global Tool Node Version:"
@@ -27,9 +27,10 @@ node {
                 echo "3. Fixing missing Vitest coverage dependency on the fly..."
                 npm install --save-dev @vitest/coverage-v8
                 
-                echo "4. Executing Unit Tests with Dual Reporting (Functional & Coverage)..."
+                echo "4. Executing Unit Tests with Dual Reporting & Quality Gates..."
                 # --reporter=default outputs text to console
                 # --reporter=junit outputs functional pass/fail data to junit.xml
+                # --coverage.thresholds enforce the 80% minimum quality rule
                 npm run test -- --coverage \
                   --reporter=default \
                   --reporter=junit \
@@ -43,10 +44,10 @@ node {
         }
         
         stage('Save Artifacts') {
-            // 4. Save the coverage dashboard folder to the Jenkins server
+            // Save the visual coverage dashboard folder to the Jenkins server
             archiveArtifacts artifacts: 'coverage/**', allowEmptyArchive: true
             
-            // 5. Publish the functional pass/fail test report directly onto the Jenkins UI dashboard
+            // Publish the functional pass/fail test report directly onto the Jenkins UI dashboard
             junit testResults: 'junit.xml', allowEmptyResults: true
         }
         
@@ -55,7 +56,7 @@ node {
         currentBuild.result = 'FAILURE'
         throw e 
     } finally {
-        // 6. Always send the notification alert, regardless of pass or fail
+        // Always send the notification alert, regardless of pass or fail
         notifyTeam(currentBuild.currentResult ?: 'SUCCESS', [
             projectModule: 'Salary & Attendance Management System',
             slackChannel: '#jenkins-alerts',
