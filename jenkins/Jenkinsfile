@@ -1,4 +1,4 @@
-// 1. Import your shared library at the very top
+// 1. Import your shared library for notifications
 @Library('shared-library') _
 
 node {
@@ -7,6 +7,7 @@ node {
     
     try {
         stage('Checkout') {
+            // Pulls the code from your currently configured Git branch
             checkout scm
         }
 
@@ -15,25 +16,27 @@ node {
         }
 
         stage('Unit Testing') {
-            withEnv(['CI=true', 'NODE_OPTIONS=--openssl-legacy-provider']) {
+            // CI=true prevents Jest from hanging in interactive watch mode.
+            // We removed the openssl flag because your Jenkins runs Node v16.
+            withEnv(['CI=true']) {
                 // The --coverage flag creates the 'coverage/' folder
                 sh 'npm run test -- --coverage'
             }
         }
         
         stage('Save Artifacts') {
-            // 2. This command actually saves the report to the Jenkins server 
-            // so your team can view it when they click the link in Slack/Email.
+            // This saves the report to the Jenkins server so your team can view it 
+            // when they click the link in the email or Slack alert.
             archiveArtifacts artifacts: 'coverage/**', allowEmptyArchive: true
         }
         
     } catch (Exception e) {
-        // If any stage above fails, mark the build as failed
+        // If any stage above fails (like a broken test), mark the build as failed
         currentBuild.result = 'FAILURE'
         throw e 
     } finally {
-        // 3. The 'finally' block acts exactly like 'post { always { ... } }'
-        // It guarantees the notification is sent whether the test passed or failed.
+        // This 'finally' block acts exactly like 'post { always { ... } }'.
+        // It guarantees the notification is sent whether the pipeline passed or failed.
         
         notifyTeam(currentBuild.currentResult ?: 'SUCCESS', [
             projectModule: 'Salary & Attendance Management System',
