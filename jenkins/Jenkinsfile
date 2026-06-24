@@ -1,25 +1,46 @@
-pipeline {
-    agent any
-    environment {
-        CI = 'true'
-    }
-    stages {
-        stage('Build') {
-            steps {
-                sh 'npm install'
+// 1. Import your shared library at the very top
+@Library('shared-library') _
+
+node {
+    // Define the path to the React coverage report Jest generates
+    def securityReportName = 'coverage/lcov-report/index.html' 
+    
+    try {
+        stage('Checkout') {
+            checkout scm
+        }
+
+        stage('Install Dependencies') {
+            sh 'npm install'
+        }
+
+        stage('Unit Testing') {
+            withEnv(['CI=true', 'NODE_OPTIONS=--openssl-legacy-provider']) {
+                // The --coverage flag creates the 'coverage/' folder
+                sh 'npm run test -- --coverage'
             }
         }
-        stage('Test') {
-            steps {
-                sh './jenkins/scripts/test.sh'
-            }
+        
+        stage('Save Artifacts') {
+            // 2. This command actually saves the report to the Jenkins server 
+            // so your team can view it when they click the link in Slack/Email.
+            archiveArtifacts artifacts: 'coverage/**', allowEmptyArchive: true
         }
-        stage('Deliver') {
-            steps {
-                sh './jenkins/scripts/deliver.sh'
-                input message: 'Finished using the web site? (Click "Proceed" to continue)'
-                sh './jenkins/scripts/kill.sh'
-            }
-        }
+        
+    } catch (Exception e) {
+        // If any stage above fails, mark the build as failed
+        currentBuild.result = 'FAILURE'
+        throw e 
+    } finally {
+        // 3. The 'finally' block acts exactly like 'post { always { ... } }'
+        // It guarantees the notification is sent whether the test passed or failed.
+        
+        notifyTeam(currentBuild.currentResult ?: 'SUCCESS', [
+            projectModule: 'Salary & Attendance Management System',
+            slackChannel: '#jenkins-alerts',
+            teamEmail: '3dnagar@gmail.com',
+            jenkinsUrl: 'http://jenkins.local:9090',
+            reportArtifact: securityReportName
+        ])
     }
 }
